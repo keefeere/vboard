@@ -604,6 +604,7 @@ class VirtualKeyboard(Gtk.Window):
         self.text_prediction_enabled = True
         self.gesture_enabled = True
         self.gesture_visual_feedback_enabled = True
+        self.dual_layout_labels_enabled = False
         self.start_minimized = False
         self.dock_mode = False
         self.auto_show_on_text_fields = False
@@ -654,6 +655,7 @@ class VirtualKeyboard(Gtk.Window):
         self.settings_dialog = None
         self.settings_gesture_check = None
         self.settings_visual_feedback_check = None
+        self.settings_dual_layout_check = None
         self.css_provider = Gtk.CssProvider()
         self._css_provider_registered = False
         self._last_suggestion_scale = None
@@ -1304,6 +1306,15 @@ class VirtualKeyboard(Gtk.Window):
         self.update_key_labels()
         self.save_settings()
 
+    def set_dual_layout_labels_enabled(self, enabled):
+        enabled = bool(enabled)
+        if enabled == self.dual_layout_labels_enabled:
+            return
+
+        self.dual_layout_labels_enabled = enabled
+        self.update_key_labels()
+        self.save_settings()
+
     def sync_gesture_controls(self):
         if (
             self.settings_gesture_check is not None
@@ -1564,25 +1575,37 @@ class VirtualKeyboard(Gtk.Window):
         grid.attach(visual_feedback_check, 0, 2, 2, 1)
         self.settings_visual_feedback_check = visual_feedback_check
 
+        dual_layout_check = Gtk.CheckButton(label="Two layouts on each key")
+        dual_layout_check.set_active(self.dual_layout_labels_enabled)
+        dual_layout_check.set_tooltip_text(
+            "Show the active English/secondary legend in the center and the "
+            "other legend in the lower-right corner"
+        )
+        dual_layout_check.connect(
+            "toggled", self.on_settings_dual_layout_toggled
+        )
+        grid.attach(dual_layout_check, 0, 3, 3, 1)
+        self.settings_dual_layout_check = dual_layout_check
+
         start_minimized_check = Gtk.CheckButton(label="Start Minimized")
         start_minimized_check.set_active(self.start_minimized)
         start_minimized_check.connect(
             "toggled", self.on_settings_start_minimized_toggled
         )
-        grid.attach(start_minimized_check, 0, 3, 2, 1)
+        grid.attach(start_minimized_check, 0, 4, 2, 1)
 
         dock_mode_check = Gtk.CheckButton(
             label="Dock Mode (reserves screen space; requires app restart)"
         )
         dock_mode_check.set_active(self.dock_mode)
         dock_mode_check.connect("toggled", self.on_settings_dock_mode_toggled)
-        grid.attach(dock_mode_check, 0, 4, 3, 1)
+        grid.attach(dock_mode_check, 0, 5, 3, 1)
 
         auto_show_check = Gtk.CheckButton(label="Auto-show on text fields (Plasma Wayland)")
         auto_show_check.set_active(self.auto_show_on_text_fields)
         auto_show_check.set_sensitive(is_kde_environment() and is_wayland_session())
         auto_show_check.connect("toggled", self.on_settings_auto_show_toggled)
-        grid.attach(auto_show_check, 0, 5, 3, 1)
+        grid.attach(auto_show_check, 0, 6, 3, 1)
 
         layout_label = Gtk.Label(label="Secondary Layout", xalign=0)
         layout_combo = Gtk.ComboBoxText()
@@ -1590,8 +1613,8 @@ class VirtualKeyboard(Gtk.Window):
             layout_combo.append(layout_key, layout_name)
         layout_combo.set_active_id(self.secondary_keyboard_layout)
         layout_combo.connect("changed", self.on_settings_secondary_layout_changed)
-        grid.attach(layout_label, 0, 6, 1, 1)
-        grid.attach(layout_combo, 1, 6, 1, 1)
+        grid.attach(layout_label, 0, 7, 1, 1)
+        grid.attach(layout_combo, 1, 7, 1, 1)
 
         about_button = Gtk.Button(label="About")
         about_button.connect("clicked", self.on_settings_about_clicked)
@@ -1599,9 +1622,9 @@ class VirtualKeyboard(Gtk.Window):
         report_bugs_button.connect("clicked", self.on_settings_report_bugs_clicked)
         quit_button = Gtk.Button(label="Quit")
         quit_button.connect("clicked", self.on_settings_quit_clicked)
-        grid.attach(about_button, 0, 7, 1, 1)
-        grid.attach(report_bugs_button, 1, 7, 1, 1)
-        grid.attach(quit_button, 2, 7, 1, 1)
+        grid.attach(about_button, 0, 8, 1, 1)
+        grid.attach(report_bugs_button, 1, 8, 1, 1)
+        grid.attach(quit_button, 2, 8, 1, 1)
 
         self.settings_dialog = dialog
         dialog.show_all()
@@ -1613,6 +1636,7 @@ class VirtualKeyboard(Gtk.Window):
         self.settings_dialog = None
         self.settings_gesture_check = None
         self.settings_visual_feedback_check = None
+        self.settings_dual_layout_check = None
 
     def on_settings_prediction_toggled(self, widget):
         self.set_text_prediction_enabled(widget.get_active())
@@ -1627,6 +1651,9 @@ class VirtualKeyboard(Gtk.Window):
 
     def on_settings_visual_feedback_toggled(self, widget):
         self.set_gesture_visual_feedback_enabled(widget.get_active())
+
+    def on_settings_dual_layout_toggled(self, widget):
+        self.set_dual_layout_labels_enabled(widget.get_active())
 
     def on_settings_start_minimized_toggled(self, widget):
         self.set_start_minimized(widget.get_active())
@@ -2607,6 +2634,19 @@ class VirtualKeyboard(Gtk.Window):
             }}
             """
 
+        css += """
+            #vboard-main #grid button .dual-layout-active-label {
+                font-size: 19px;
+                font-weight: 600;
+            }
+
+            #vboard-main #grid button .dual-layout-inactive-label {
+                font-size: 11px;
+                font-weight: 400;
+                opacity: 0.45;
+            }
+        """
+
         try:
             self.css_provider.load_from_data(css.encode("utf-8"))
         except GLib.GError as exc:
@@ -2634,7 +2674,8 @@ class VirtualKeyboard(Gtk.Window):
                 col += width
                 continue
 
-            button = Gtk.Button(label=self.get_button_label(key_event))
+            button = Gtk.Button()
+            self.update_key_button_content(button, key_event)
             button.set_can_focus(False)
             button.set_focus_on_click(False)
             self.connect_key_input_events(button, key_event)
@@ -2706,9 +2747,84 @@ class VirtualKeyboard(Gtk.Window):
 
         return key_label
 
+    def get_layout_key_label(self, layout_key, key_event):
+        layout = self.keyboard_layouts.get(layout_key)
+        if layout is None:
+            return key_event
+
+        key_label = layout["labels"].get(key_event, key_event)
+        shifted_map = layout["shifted"]
+        shift_active = self.modifiers["Shift_L"] or self.modifiers["Shift_R"]
+
+        if len(key_label) == 1 and key_label.isalpha():
+            uppercase_active = shift_active != self.caps_lock_active
+            return key_label.upper() if uppercase_active else key_label.lower()
+
+        if shift_active and key_event in shifted_map:
+            return shifted_map[key_event]
+        return key_label
+
+    def get_companion_keyboard_layout(self):
+        if self.keyboard_layout == self.primary_keyboard_layout:
+            return self.secondary_keyboard_layout
+        if self.keyboard_layout == self.secondary_keyboard_layout:
+            return self.primary_keyboard_layout
+        return None
+
+    def get_dual_layout_labels(self, key_event):
+        if not self.dual_layout_labels_enabled or len(key_event) != 1:
+            return None
+
+        companion_layout = self.get_companion_keyboard_layout()
+        if companion_layout is None:
+            return None
+
+        active_label = self.get_button_label(key_event)
+        companion_label = self.get_layout_key_label(companion_layout, key_event)
+        if not active_label or not companion_label or active_label == companion_label:
+            return None
+        return active_label, companion_label
+
+    @staticmethod
+    def replace_button_child(button, child):
+        current_child = button.get_child()
+        if current_child is not None:
+            button.remove(current_child)
+        button.add(child)
+
+    def update_key_button_content(self, button, key_event):
+        dual_labels = self.get_dual_layout_labels(key_event)
+        if dual_labels is None:
+            self.replace_button_child(
+                button,
+                Gtk.Label(label=self.get_button_label(key_event)),
+            )
+            button.show_all()
+            return
+
+        active_label, companion_label = dual_labels
+        overlay = Gtk.Overlay()
+
+        active = Gtk.Label(label=active_label)
+        active.set_halign(Gtk.Align.CENTER)
+        active.set_valign(Gtk.Align.CENTER)
+        active.get_style_context().add_class("dual-layout-active-label")
+        overlay.add(active)
+
+        companion = Gtk.Label(label=companion_label)
+        companion.set_halign(Gtk.Align.END)
+        companion.set_valign(Gtk.Align.END)
+        companion.set_margin_end(4)
+        companion.set_margin_bottom(2)
+        companion.get_style_context().add_class("dual-layout-inactive-label")
+        overlay.add_overlay(companion)
+
+        self.replace_button_child(button, overlay)
+        button.show_all()
+
     def update_key_labels(self):
         for key_label, button in self.key_buttons.items():
-            button.set_label(self.get_button_label(key_label))
+            self.update_key_button_content(button, key_label)
             if key_label == LAYOUT_SWITCH_KEY:
                 button.set_tooltip_text(self.get_layout_switch_tooltip())
 
@@ -3419,6 +3535,11 @@ class VirtualKeyboard(Gtk.Window):
                     "gesture_visual_feedback_enabled",
                     fallback=True,
                 )
+                self.dual_layout_labels_enabled = self.config.getboolean(
+                    "DEFAULT",
+                    "dual_layout_labels_enabled",
+                    fallback=False,
+                )
                 self.text_prediction_enabled = self.config.getboolean(
                     "DEFAULT",
                     "text_prediction_enabled",
@@ -3487,6 +3608,7 @@ class VirtualKeyboard(Gtk.Window):
             "gesture_visual_feedback_enabled": str(
                 self.gesture_visual_feedback_enabled
             ),
+            "dual_layout_labels_enabled": str(self.dual_layout_labels_enabled),
             "keyboard_layout": self.keyboard_layout,
             "secondary_keyboard_layout": self.secondary_keyboard_layout,
             "width": self.width,

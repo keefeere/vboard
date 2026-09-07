@@ -275,6 +275,7 @@ When launched, vboard presents a compact keyboard with a minimal interface. The 
 - Delete, Insert, Page Up, Page Down, Home, and End navigation keys
 - Header-bar suggestions that follow vboard's active layout when a matching system or user Hunspell dictionary is available
 - Optional swipe typing on alphabetic keys: enable **Swipe Typing** in Options, drag across the intended letters, and release to insert the best matching dictionary word
+- Optional dual legends: enable **Two layouts on each key** to keep the active English/secondary symbol large and show the other layout dimmed in the lower-right corner
 - Multitouch modifiers: keep Shift, Ctrl, Alt, or Super held with one finger and press another key with a second finger
 - Hold-to-repeat for keyboard, function, and navigation keys after a short delay; intentional swipe movement cancels repeat for that touch
 - System XKB level-three/four labels while Alt or Alt+Shift is active, including symbols from the configured layout variant
@@ -310,6 +311,7 @@ vboard saves its settings to `~/.config/vboard/settings.conf`. This configuratio
 - Text-field auto-show enabled/disabled state
 - Keyboard layout
 - Secondary keyboard layout used by the quick-switch key
+- Two-layout key legends enabled/disabled state (disabled by default)
 - Opacity level
 - Text color
 
