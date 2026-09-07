@@ -1,3 +1,10 @@
+vboard (2.11.0-1) unstable; urgency=medium
+
+  * Add system XKB alternate labels, touch-gap recovery, safer swipe typing,
+    and optional dual-layout key legends
+
+ -- Chechulin Serhii <78239416+keefeere@users.noreply.github.com>  Mon, 07 Sep 2026 18:46:50 +0300
+
 vboard (2.10.0-1) unstable; urgency=medium
 
   * Add multitouch holds and suppress the native Plasma keyboard while Vboard is visible

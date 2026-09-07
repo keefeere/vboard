@@ -21,6 +21,7 @@ Depends: ${misc:Depends},
  python3-gi,
  gir1.2-gtk-3.0,
  gir1.2-gtklayershell-0.1,
+ libxkbcommon0,
  python3-uinput
 Recommends: hunspell-en-us, gir1.2-ayatanaappindicator3-0.1 | gir1.2-appindicator3-0.1, plasma-keyboard
 Description: Wayland virtual keyboard for GNU/Linux with modifier key support

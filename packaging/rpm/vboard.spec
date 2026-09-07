@@ -1,5 +1,5 @@
 Name:           vboard
-Version:        2.10.0
+Version:        2.11.0
 Release:        1%{?dist}
 Summary:        Wayland virtual keyboard with modifier key support
 
@@ -19,6 +19,7 @@ BuildRequires:  python3-gobject
 Requires:       gobject-introspection
 Requires:       gtk3
 Requires:       gtk-layer-shell
+Requires:       libxkbcommon
 Requires:       python3-cairo
 Requires:       python3-gobject
 Requires:       python3-uinput
@@ -95,6 +96,9 @@ python3 -m unittest discover -s tests -v
 
 
 %changelog
+* Mon Sep 07 2026 Chechulin Serhii <78239416+keefeere@users.noreply.github.com> - 2.11.0-1
+- Add XKB alternate labels, touch-gap recovery, safer swipe typing, and dual-layout legends
+
 * Sun Sep 06 2026 Chechulin Serhii <78239416+keefeere@users.noreply.github.com> - 2.10.0-1
 - Add multitouch holds and suppress the native Plasma keyboard while Vboard is visible
 
