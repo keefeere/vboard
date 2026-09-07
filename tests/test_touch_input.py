@@ -232,6 +232,51 @@ class TouchInputTest(unittest.TestCase):
         self.assertEqual(keyboard.active_touch_keys, {})
         self.assertEqual(self.fake_glib.callbacks, {})
 
+    def test_gap_touch_selects_the_nearest_key(self):
+        left_button = object()
+        right_button = object()
+        targets = [
+            ("A", left_button, (0, 0, 40, 40)),
+            ("S", right_button, (44, 0, 40, 40)),
+        ]
+
+        target = VirtualKeyboard.choose_nearest_touch_target(43, 20, targets)
+
+        self.assertEqual(target, ("S", right_button))
+
+    def test_gap_touch_ignores_points_far_from_every_key(self):
+        targets = [("A", object(), (0, 0, 40, 40))]
+
+        target = VirtualKeyboard.choose_nearest_touch_target(20, 70, targets)
+
+        self.assertIsNone(target)
+
+    def test_intentional_swipe_cancels_touch_repeat_delay(self):
+        keyboard = self.make_keyboard()
+        controller = SimpleNamespace(active_gesture=None)
+
+        def begin_gesture(widget, event, key_event):
+            controller.active_gesture = {"key_path": ["a"]}
+            return True
+
+        controller.handle_key_press = begin_gesture
+        controller.handle_key_motion = lambda widget, event: True
+        controller.is_swipe_in_progress = lambda: True
+        keyboard.gesture_controller = controller
+
+        VirtualKeyboard.begin_touch_key(
+            keyboard,
+            1,
+            object(),
+            object(),
+            "A",
+        )
+        delay_source = keyboard.active_touch_keys[1]["delay_source"]
+        VirtualKeyboard.update_touch_key(keyboard, 1, object(), object())
+
+        self.assertIn(delay_source, self.fake_glib.removed)
+        self.assertIsNone(keyboard.active_touch_keys[1]["delay_source"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -48,6 +48,7 @@ install_data(
     'vboard/plasma_layouts.py',
     'vboard/suggestions.py',
     'vboard/window.py',
+    'vboard/xkb_labels.py',
   ),
   install_dir: vboard_python_dir,
 )

@@ -9,6 +9,8 @@ GESTURE_SAMPLE_POINTS = 24
 GESTURE_MIN_PATH_KEYS = 3
 GESTURE_MIN_PATH_DISTANCE_FACTOR = 0.9
 GESTURE_POINT_SAMPLE_STEP_FACTOR = 0.12
+GESTURE_REPEAT_CANCEL_DISTANCE_FACTOR = 0.22
+GESTURE_REPEAT_CANCEL_MIN_DISTANCE = 8.0
 GESTURE_FEEDBACK_CLEAR_DELAY_MS = 180
 GESTURE_FEEDBACK_FRAME_DELAY_MS = 100
 GESTURE_FEEDBACK_SAMPLE_DISTANCE_FACTOR = 0.3
@@ -400,6 +402,18 @@ class GestureTypingController:
         self.record_gesture_motion(widget, event)
         self.finish_gesture(key_event)
         return True
+
+    def is_swipe_in_progress(self):
+        if self.active_gesture is None:
+            return False
+        distance_threshold = max(
+            GESTURE_REPEAT_CANCEL_MIN_DISTANCE,
+            self.gesture_key_pitch * GESTURE_REPEAT_CANCEL_DISTANCE_FACTOR,
+        )
+        return (
+            len(self.active_gesture["key_path"]) >= 2
+            or self.active_gesture["total_distance"] >= distance_threshold
+        )
 
     def cancel_key_gesture(self, widget):
         if self.active_gesture is None or self.active_gesture["widget"] is not widget:

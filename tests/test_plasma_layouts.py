@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from vboard.plasma_layouts import get_next_quick_layout
+from vboard.plasma_layouts import PlasmaLayoutController, get_next_quick_layout
 from vboard.window import VirtualKeyboard
 
 
@@ -35,6 +35,7 @@ class PlasmaLayoutFallbackTest(unittest.TestCase):
             text_prediction_enabled=False,
             current_word="old word",
             normalize_keyboard_layout=lambda layout_key: layout_key,
+            refresh_system_key_levels=mock.Mock(),
             refresh_layout_character_lookup=mock.Mock(),
             rebuild_keyboard_grid=mock.Mock(),
             clear_suggestion_override=mock.Mock(),
@@ -55,6 +56,22 @@ class PlasmaLayoutFallbackTest(unittest.TestCase):
             "Warning: Layout is not available in Plasma; "
             "switching Vboard without system layout synchronization: uk"
         )
+
+
+class PlasmaXkbNamesTest(unittest.TestCase):
+    def test_uses_current_variant_for_system_labels(self):
+        controller = SimpleNamespace(
+            layouts=[
+                ("us", "", "English"),
+                ("ua", "unicode", "Ukrainian"),
+                ("ua", "winkeys", "Ukrainian Windows"),
+            ],
+            get_current_layout_index=lambda: 2,
+        )
+
+        names = PlasmaLayoutController.get_xkb_layout_names(controller, "uk")
+
+        self.assertEqual(names, ("ua", "winkeys"))
 
 
 if __name__ == "__main__":

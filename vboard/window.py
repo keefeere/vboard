@@ -40,8 +40,13 @@ from .layouts import (
     get_layout_switch_label,
     load_keyboard_layouts,
 )
-from .plasma_layouts import PlasmaLayoutController, get_next_quick_layout
+from .plasma_layouts import (
+    VBOARD_TO_XKB_LAYOUT,
+    PlasmaLayoutController,
+    get_next_quick_layout,
+)
 from .suggestions import HunspellSuggestionEngine
+from .xkb_labels import get_xkb_level_labels
 
 
 BUG_REPORT_URL = "https://github.com/archisman-panigrahi/vboard/issues/"
@@ -372,7 +377,7 @@ class StatusNotifierTrayIcon:
             (
                 3,
                 {
-                    "label": "Touch Typing (requires app restart)",
+                    "label": "Swipe Typing",
                     "toggle-type": "checkmark",
                     "toggle-state": int(self.window.gesture_enabled),
                 },
@@ -546,6 +551,7 @@ class VirtualKeyboard(Gtk.Window):
     BASE_SUGGESTION_MARGIN_BOTTOM = 1
     KEY_REPEAT_DELAY_MS = 400
     KEY_REPEAT_INTERVAL_MS = 100
+    TOUCH_GAP_RADIUS_FACTOR = 0.22
 
     def __init__(self, application=None):
         super().__init__(title=APP_DISPLAY_NAME, name="toplevel")
@@ -603,9 +609,11 @@ class VirtualKeyboard(Gtk.Window):
         self.auto_show_on_text_fields = False
         self.keyboard_layout = self.primary_keyboard_layout
         self.plasma_layout_controller = None
+        self.system_key_levels = {}
         self.secondary_keyboard_layout = self.get_default_secondary_keyboard_layout()
         self.read_settings()
         self.initialize_plasma_layout_sync()
+        self.refresh_system_key_levels()
         self.dock_active = configure_dock_window(self, self.dock_mode)
         self.text_input_monitor = None
         self._suppress_next_auto_hide = False
@@ -696,6 +704,8 @@ class VirtualKeyboard(Gtk.Window):
         grid.set_margin_start(3)
         grid.set_margin_end(3)
         grid.set_name("grid")
+        grid.add_events(Gdk.EventMask.TOUCH_MASK)
+        grid.connect("touch-event", self.on_grid_touch_event)
         grid.connect("size-allocate", self.on_grid_size_allocate)
         self.grid = grid
         grid_overlay.add(grid)
@@ -811,9 +821,7 @@ class VirtualKeyboard(Gtk.Window):
         self.tray_prediction_item.connect("toggled", self.on_tray_prediction_toggled)
         tray_menu.append(self.tray_prediction_item)
 
-        self.tray_gesture_item = Gtk.CheckMenuItem(
-            label="Touch Typing (requires app restart)"
-        )
+        self.tray_gesture_item = Gtk.CheckMenuItem(label="Swipe Typing")
         self.tray_gesture_item.connect("toggled", self.on_tray_gesture_toggled)
         tray_menu.append(self.tray_gesture_item)
 
@@ -1125,6 +1133,43 @@ class VirtualKeyboard(Gtk.Window):
     def get_active_shifted_map(self):
         return self.get_layout_config()["shifted"]
 
+    def get_active_xkb_layout_names(self):
+        if self.plasma_layout_controller is not None:
+            names = self.plasma_layout_controller.get_xkb_layout_names(
+                self.keyboard_layout
+            )
+            if names is not None:
+                return names
+
+        xkb_layout = VBOARD_TO_XKB_LAYOUT.get(self.keyboard_layout)
+        return (xkb_layout, "") if xkb_layout is not None else None
+
+    def refresh_system_key_levels(self):
+        self.system_key_levels = {}
+        names = self.get_active_xkb_layout_names()
+        if names is None:
+            return
+        try:
+            self.system_key_levels = get_xkb_level_labels(*names)
+        except (OSError, RuntimeError, ValueError) as exc:
+            print(f"Warning: Could not read system XKB key labels ({exc}).")
+
+    def get_alternate_key_label(self, key_event, shift_active):
+        alternate_label = self.system_key_levels.get(2, {}).get(key_event)
+        if alternate_label is None:
+            return None
+
+        shifted_alternate = self.system_key_levels.get(3, {}).get(key_event)
+        if len(alternate_label) == 1 and alternate_label.isalpha():
+            uppercase_active = shift_active != self.caps_lock_active
+            if uppercase_active:
+                return shifted_alternate or alternate_label.upper()
+            return alternate_label
+
+        if shift_active and shifted_alternate is not None:
+            return shifted_alternate
+        return alternate_label
+
     def sync_caps_lock_from_system(self, keymap=None, connect=False):
         try:
             keymap = keymap or Gdk.Keymap.get_default()
@@ -1226,10 +1271,14 @@ class VirtualKeyboard(Gtk.Window):
                     "switching Vboard without system layout synchronization: "
                     f"{normalized_layout}"
                 )
-        if normalized_layout == self.keyboard_layout:
+        layout_changed = normalized_layout != self.keyboard_layout
+        self.keyboard_layout = normalized_layout
+        self.refresh_system_key_levels()
+        if not layout_changed:
+            if hasattr(self, "key_buttons"):
+                self.update_key_labels()
             return
 
-        self.keyboard_layout = normalized_layout
         self.suggestion_engine.set_layout(normalized_layout)
         self.refresh_layout_character_lookup()
         self.rebuild_keyboard_grid()
@@ -1500,9 +1549,7 @@ class VirtualKeyboard(Gtk.Window):
         prediction_check.connect("toggled", self.on_settings_prediction_toggled)
         grid.attach(prediction_check, 0, 0, 2, 1)
 
-        gesture_check = Gtk.CheckButton(
-            label="Touch Typing (requires app restart)"
-        )
+        gesture_check = Gtk.CheckButton(label="Swipe Typing")
         gesture_check.set_active(self.gesture_enabled)
         gesture_check.connect("toggled", self.on_settings_gesture_toggled)
         grid.attach(gesture_check, 0, 1, 2, 1)
@@ -2642,7 +2689,13 @@ class VirtualKeyboard(Gtk.Window):
         key_labels = self.get_active_key_labels()
         shifted_map = self.get_active_shifted_map()
         shift_active = self.modifiers["Shift_L"] or self.modifiers["Shift_R"]
+        alt_active = self.modifiers["Alt_L"] or self.modifiers["Alt_R"]
         key_label = key_labels.get(key_event, key_event)
+
+        if alt_active:
+            alternate_label = self.get_alternate_key_label(key_event, shift_active)
+            if alternate_label is not None:
+                return alternate_label
 
         if len(key_label) == 1 and key_label.isalpha():
             uppercase_active = shift_active != self.caps_lock_active
@@ -2813,6 +2866,86 @@ class VirtualKeyboard(Gtk.Window):
         # wrapper and therefore made TOUCH_END miss the matching TOUCH_BEGIN.
         return sequence if sequence is not None else event
 
+    @staticmethod
+    def point_to_rect_distance_squared(x, y, rect):
+        rect_x, rect_y, rect_width, rect_height = rect
+        delta_x = max(rect_x - x, 0, x - (rect_x + rect_width))
+        delta_y = max(rect_y - y, 0, y - (rect_y + rect_height))
+        return (delta_x * delta_x) + (delta_y * delta_y)
+
+    @classmethod
+    def choose_nearest_touch_target(cls, x, y, targets):
+        candidates = []
+        for key_event, button, rect in targets:
+            _rect_x, _rect_y, rect_width, rect_height = rect
+            if rect_width <= 0 or rect_height <= 0:
+                continue
+            radius = min(rect_width, rect_height) * cls.TOUCH_GAP_RADIUS_FACTOR
+            distance_squared = cls.point_to_rect_distance_squared(x, y, rect)
+            if distance_squared > radius * radius:
+                continue
+            center_x = rect[0] + (rect_width / 2.0)
+            center_y = rect[1] + (rect_height / 2.0)
+            center_distance_squared = ((center_x - x) ** 2) + ((center_y - y) ** 2)
+            candidates.append(
+                (distance_squared, center_distance_squared, key_event, button)
+            )
+
+        if not candidates:
+            return None
+        candidates.sort(key=lambda candidate: candidate[:2])
+        return candidates[0][2:]
+
+    def find_nearest_touch_key(self, x, y):
+        targets = []
+        for key_event, button in self.key_buttons.items():
+            allocation = button.get_allocation()
+            translated = button.translate_coordinates(self.grid, 0, 0)
+            if translated is None:
+                translated = (allocation.x, allocation.y)
+            targets.append(
+                (
+                    key_event,
+                    button,
+                    (
+                        translated[0],
+                        translated[1],
+                        allocation.width,
+                        allocation.height,
+                    ),
+                )
+            )
+        return self.choose_nearest_touch_target(x, y, targets)
+
+    def on_grid_touch_event(self, widget, event):
+        sequence_id = self.get_touch_sequence_id(event)
+        if event.type == Gdk.EventType.TOUCH_BEGIN:
+            target = self.find_nearest_touch_key(event.x, event.y)
+            if target is None:
+                return False
+            key_event, button = target
+            self.begin_touch_key(
+                sequence_id,
+                button,
+                event,
+                key_event,
+                event_widget=widget,
+            )
+            return True
+
+        state = self.active_touch_keys.get(sequence_id)
+        if state is None or state["event_widget"] is not widget:
+            return False
+        if event.type == Gdk.EventType.TOUCH_UPDATE:
+            self.update_touch_key(sequence_id, widget, event)
+        elif event.type in (Gdk.EventType.TOUCH_END, Gdk.EventType.TOUCH_CANCEL):
+            self.finish_touch_key(
+                sequence_id,
+                event,
+                cancelled=event.type == Gdk.EventType.TOUCH_CANCEL,
+            )
+        return True
+
     def on_key_touch_event(self, widget, event, key_event):
         sequence_id = self.get_touch_sequence_id(event)
         if event.type == Gdk.EventType.TOUCH_BEGIN:
@@ -2836,7 +2969,14 @@ class VirtualKeyboard(Gtk.Window):
                 )
         return True
 
-    def begin_touch_key(self, sequence_id, widget, event, key_event):
+    def begin_touch_key(
+        self,
+        sequence_id,
+        widget,
+        event,
+        key_event,
+        event_widget=None,
+    ):
         if sequence_id in self.active_touch_keys:
             return
 
@@ -2847,6 +2987,7 @@ class VirtualKeyboard(Gtk.Window):
         self.clear_suggestion_override(update=False)
         state = {
             "widget": widget,
+            "event_widget": event_widget or widget,
             "key_event": key_event,
             "last_event": event,
             "delay_source": None,
@@ -2889,7 +3030,11 @@ class VirtualKeyboard(Gtk.Window):
         if (
             self.gesture_controller is not None
             and self.gesture_controller.active_gesture is None
-            and self.gesture_controller.handle_key_press(widget, event, key_event)
+            and self.gesture_controller.handle_key_press(
+                state["event_widget"],
+                event,
+                key_event,
+            )
         ):
             state["gesture_pending"] = True
         else:
@@ -2924,7 +3069,14 @@ class VirtualKeyboard(Gtk.Window):
             return
         state["last_event"] = event
         if state["gesture_pending"] and self.gesture_controller is not None:
-            self.gesture_controller.handle_key_motion(widget, event)
+            handled = self.gesture_controller.handle_key_motion(
+                state["event_widget"],
+                event,
+            )
+            if handled and self.gesture_controller.is_swipe_in_progress():
+                if state["delay_source"] is not None:
+                    GLib.source_remove(state["delay_source"])
+                    state["delay_source"] = None
 
     def start_touch_repeat(self, sequence_id):
         state = self.active_touch_keys.get(sequence_id)
@@ -2933,7 +3085,7 @@ class VirtualKeyboard(Gtk.Window):
         state["delay_source"] = None
         if state["gesture_pending"] and self.gesture_controller is not None:
             self.gesture_controller.handle_key_release(
-                state["widget"],
+                state["event_widget"],
                 state["last_event"],
                 state["key_event"],
             )
@@ -2978,10 +3130,10 @@ class VirtualKeyboard(Gtk.Window):
                 self.held_touch_modifiers[key_event] = held_count - 1
         elif state["gesture_pending"] and self.gesture_controller is not None:
             if cancelled:
-                self.gesture_controller.cancel_key_gesture(state["widget"])
+                self.gesture_controller.cancel_key_gesture(state["event_widget"])
             else:
                 self.gesture_controller.handle_key_release(
-                    state["widget"],
+                    state["event_widget"],
                     event or state["last_event"],
                     key_event,
                 )

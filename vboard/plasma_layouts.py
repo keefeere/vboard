@@ -66,9 +66,29 @@ class PlasmaLayoutController:
         )
 
     def get_current_vboard_layout(self):
+        return self.vboard_layout_for_index(self.get_current_layout_index())
+
+    def get_current_layout_index(self):
         result = self.call("getLayout")
-        layout_index = result.unpack()[0]
-        return self.vboard_layout_for_index(layout_index)
+        return result.unpack()[0]
+
+    def get_xkb_layout_names(self, vboard_layout):
+        """Return the configured XKB layout and variant for a Vboard layout."""
+
+        xkb_layout = VBOARD_TO_XKB_LAYOUT.get(vboard_layout)
+        if xkb_layout is None:
+            return None
+
+        current_index = self.get_current_layout_index()
+        if 0 <= current_index < len(self.layouts):
+            layout, variant, _description = self.layouts[current_index]
+            if layout == xkb_layout:
+                return (layout, variant)
+
+        for layout, variant, _description in self.layouts:
+            if layout == xkb_layout:
+                return (layout, variant)
+        return None
 
     def vboard_layout_for_index(self, layout_index):
         if layout_index < 0 or layout_index >= len(self.layouts):

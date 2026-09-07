@@ -31,6 +31,8 @@ and user-defined JSON layouts.
 - **Plasma layout synchronization**: Follows supported KDE Plasma keyboard layouts and provides a configurable quick-switch key
 - **Desktop compatibility**: Native Wayland-friendly behavior on KDE Plasma, with GNOME support via Xwayland fallback
 - **Mouse and multitouch hold support**: Hold ordinary keys for repeat, or hold modifiers with one finger while pressing keys with another
+- **System XKB alternate labels**: Alt/Alt+Shift redraw keys with the active layout's third/fourth-level characters, including Ukrainian Russian-letter alternatives and number-row symbols
+- **Touch-gap tolerance**: Small gaps between keys are assigned conservatively to the nearest key
 - **Word suggestions**: Offers Unicode completions from the Hunspell dictionary that matches the active vboard layout
 - **Gesture typing**: Swipe across letter keys in the active layout and vboard will decode the path with its matching Hunspell dictionary
 - **Plasma widget**: Includes an optional one-click panel/desktop widget for showing or hiding vboard
@@ -272,9 +274,11 @@ When launched, vboard presents a compact keyboard with a minimal interface. The 
 - F1-F12 function keys in the header bar
 - Delete, Insert, Page Up, Page Down, Home, and End navigation keys
 - Header-bar suggestions that follow vboard's active layout when a matching system or user Hunspell dictionary is available
-- Experimental swipe typing on alphabetic keys: drag across the intended letters and release to insert the best matching dictionary word
+- Optional swipe typing on alphabetic keys: enable **Swipe Typing** in Options, drag across the intended letters, and release to insert the best matching dictionary word
 - Multitouch modifiers: keep Shift, Ctrl, Alt, or Super held with one finger and press another key with a second finger
-- Hold-to-repeat for keyboard, function, and navigation keys after a short delay
+- Hold-to-repeat for keyboard, function, and navigation keys after a short delay; intentional swipe movement cancels repeat for that touch
+- System XKB level-three/four labels while Alt or Alt+Shift is active, including symbols from the configured layout variant
+- Nearest-key recovery for touches that begin in a small visual gap between keys
 
 ### Interface Controls
 - ☰ (menu) - Toggle visibility of other interface controls
@@ -299,7 +303,7 @@ vboard saves its settings to `~/.config/vboard/settings.conf`. This configuratio
 - Background color
 - Theme style
 - Text prediction enabled/disabled state
-- Gesture typing enabled/disabled state
+- Swipe typing enabled/disabled state
 - Gesture visual feedback enabled/disabled state
 - Start minimized enabled/disabled state
 - Dock mode enabled/disabled state
