@@ -57,6 +57,9 @@ class StartupVisibilityTest(unittest.TestCase):
             application,
             target,
         )
+        application.toggle_window = lambda: VboardApplication.toggle_window(
+            application
+        )
         return application
 
     def test_initial_activation_stays_hidden_when_configured(self):
@@ -102,6 +105,16 @@ class StartupVisibilityTest(unittest.TestCase):
         )
 
         self.assertEqual(window.calls, ["toggle"])
+
+    def test_application_action_uses_the_same_warm_toggle_path(self):
+        window = FakeWindow(start_minimized=True)
+        application = self.make_application(window)
+
+        VboardApplication.on_toggle_action(application)
+
+        self.assertIn("show", window.calls)
+        VboardApplication.on_toggle_action(application)
+        self.assertEqual(window.calls[-1], "toggle")
 
     def test_system_keyboard_is_suppressed_before_vboard_is_mapped(self):
         calls = []

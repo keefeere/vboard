@@ -2841,7 +2841,7 @@ class VirtualKeyboard(Gtk.Window):
         style_context = button.get_style_context()
         modifier_class = (
             "active-command-modifier"
-            if key_event.startswith(("Shift", "Ctrl", "Alt"))
+            if key_event.startswith(("Shift", "Ctrl", "Alt", "Super"))
             else "active-modifier"
         )
         style_context.remove_class("active-modifier")
@@ -3112,6 +3112,7 @@ class VirtualKeyboard(Gtk.Window):
             "kind": "key",
             "modifier_was_active": False,
             "modifier_used_as_hold": False,
+            "modifier_pressed": False,
         }
         self.active_touch_keys[sequence_id] = state
 
@@ -3133,7 +3134,6 @@ class VirtualKeyboard(Gtk.Window):
             held_count = self.held_touch_modifiers.get(key_event, 0)
             self.held_touch_modifiers[key_event] = held_count + 1
             if held_count == 0:
-                self.backend.press_key(key_event)
                 self.update_modifier(key_event, True)
                 self.update_key_labels()
             state["delay_source"] = GLib.timeout_add(
@@ -3167,6 +3167,9 @@ class VirtualKeyboard(Gtk.Window):
             if state["kind"] != "modifier":
                 continue
             state["modifier_used_as_hold"] = True
+            if not state["modifier_pressed"]:
+                self.backend.press_key(state["key_event"])
+                state["modifier_pressed"] = True
             if state["delay_source"] is not None:
                 GLib.source_remove(state["delay_source"])
                 state["delay_source"] = None
@@ -3235,7 +3238,16 @@ class VirtualKeyboard(Gtk.Window):
             held_count = self.held_touch_modifiers.get(key_event, 0)
             if held_count <= 1:
                 self.held_touch_modifiers.pop(key_event, None)
-                self.backend.release_key(key_event)
+                if state["modifier_pressed"]:
+                    self.backend.release_key(key_event)
+                elif state["modifier_used_as_hold"]:
+                    # A held modifier released without a chord represents a
+                    # deliberate standalone press. This is especially useful
+                    # for Super, whose standalone action opens the desktop
+                    # overview/application launcher, while a short tap remains
+                    # available for sticky one-finger shortcuts.
+                    self.backend.press_key(key_event)
+                    self.backend.release_key(key_event)
                 if state["modifier_used_as_hold"]:
                     next_active = state["modifier_was_active"]
                 else:

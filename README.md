@@ -293,8 +293,10 @@ When launched, vboard presents a compact keyboard with a minimal interface. The 
 - **Tray icon right-click** - Open tray controls when the tray backend supports a separate context menu
 
 Run `vboard --toggle` to start and show vboard when it is not running, or to
-show/hide the existing instance. The included Plasma widget uses this command,
-and it remains responsive when **Start Minimized** is enabled. On Plasma
+show/hide the existing instance. When Vboard is already resident, the included
+Plasma widget invokes its lightweight GApplication action directly and keeps
+`vboard --toggle` as the cold-start fallback. It remains responsive when
+**Start Minimized** is enabled. On Plasma
 Wayland, this path disables the native input panel before mapping the Vboard
 window, avoiding overlap and duplicate reserved geometry between the two
 keyboards.

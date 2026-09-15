@@ -118,15 +118,12 @@ class TouchInputTest(unittest.TestCase):
             "Ctrl_L",
         )
         self.assertTrue(keyboard.modifiers["Ctrl_L"])
-        self.assertEqual(keyboard.backend.events, [("down", "Ctrl_L")])
+        self.assertEqual(keyboard.backend.events, [])
 
         VirtualKeyboard.finish_touch_key(keyboard, 1)
 
         self.assertTrue(keyboard.modifiers["Ctrl_L"])
-        self.assertEqual(
-            keyboard.backend.events,
-            [("down", "Ctrl_L"), ("up", "Ctrl_L")],
-        )
+        self.assertEqual(keyboard.backend.events, [])
 
         VirtualKeyboard.begin_touch_key(
             keyboard,
@@ -139,6 +136,21 @@ class TouchInputTest(unittest.TestCase):
 
         self.assertFalse(keyboard.modifiers["Ctrl_L"])
 
+    def test_short_super_touch_does_not_emit_standalone_meta(self):
+        keyboard = self.make_keyboard()
+
+        VirtualKeyboard.begin_touch_key(
+            keyboard,
+            1,
+            object(),
+            object(),
+            "Super_L",
+        )
+        VirtualKeyboard.finish_touch_key(keyboard, 1)
+
+        self.assertTrue(keyboard.modifiers["Super_L"])
+        self.assertEqual(keyboard.backend.events, [])
+
     def test_held_touch_modifier_is_momentary(self):
         keyboard = self.make_keyboard()
         VirtualKeyboard.begin_touch_key(
@@ -146,13 +158,17 @@ class TouchInputTest(unittest.TestCase):
             1,
             object(),
             object(),
-            "Shift_L",
+            "Super_L",
         )
 
         VirtualKeyboard.mark_touch_modifier_held(keyboard, 1)
         VirtualKeyboard.finish_touch_key(keyboard, 1)
 
-        self.assertFalse(keyboard.modifiers["Shift_L"])
+        self.assertFalse(keyboard.modifiers["Super_L"])
+        self.assertEqual(
+            keyboard.backend.events,
+            [("down", "Super_L"), ("up", "Super_L")],
+        )
 
     def test_modifier_used_with_second_touch_is_momentary(self):
         keyboard = self.make_keyboard()
@@ -168,6 +184,33 @@ class TouchInputTest(unittest.TestCase):
         VirtualKeyboard.finish_touch_key(keyboard, 1)
 
         self.assertFalse(keyboard.modifiers["Shift_L"])
+
+    def test_second_touch_physically_holds_modifier_for_the_chord(self):
+        keyboard = self.make_keyboard()
+        VirtualKeyboard.begin_touch_key(
+            keyboard,
+            1,
+            object(),
+            object(),
+            "Super_L",
+        )
+
+        VirtualKeyboard.begin_touch_key(
+            keyboard,
+            2,
+            object(),
+            object(),
+            "L",
+        )
+        VirtualKeyboard.finish_touch_key(keyboard, 2)
+        VirtualKeyboard.finish_touch_key(keyboard, 1)
+
+        self.assertEqual(keyboard.emitted, ["L"])
+        self.assertEqual(
+            keyboard.backend.events,
+            [("down", "Super_L"), ("up", "Super_L")],
+        )
+        self.assertFalse(keyboard.modifiers["Super_L"])
 
     def test_each_touch_key_has_an_independent_repeat_timer(self):
         keyboard = self.make_keyboard()

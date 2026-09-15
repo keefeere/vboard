@@ -15,7 +15,7 @@ PlasmoidItem {
     id: root
 
     readonly property string iconName: "input-keyboard"
-    readonly property string toggleCommand: "/bin/sh -c '/usr/bin/nohup /usr/bin/env vboard --toggle </dev/null >/dev/null 2>&1 &'"
+    readonly property string toggleCommand: "/bin/sh -c '/usr/bin/gapplication action io.github.archisman-panigrahi.vboard toggle >/dev/null 2>&1 || /usr/bin/nohup /usr/bin/env vboard --toggle </dev/null >/dev/null 2>&1 &'"
     property bool busy: false
 
     Plasmoid.icon: iconName
@@ -25,6 +25,13 @@ PlasmoidItem {
     preferredRepresentation: Plasmoid.formFactor === PlasmaCore.Types.Planar
         ? fullRepresentation
         : compactRepresentation
+
+    function handleActivationKey(event) {
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
+            root.toggleKeyboard();
+            event.accepted = true;
+        }
+    }
 
     function toggleKeyboard() {
         if (busy) {
@@ -50,30 +57,47 @@ PlasmoidItem {
         }
     }
 
+    TapHandler {
+        acceptedButtons: Qt.LeftButton
+        gesturePolicy: TapHandler.ReleaseWithinBounds
+        onTapped: root.toggleKeyboard()
+    }
+
+    HoverHandler {
+        id: hoverHandler
+
+        cursorShape: Qt.PointingHandCursor
+    }
+
     compactRepresentation: Item {
+        id: compactButton
+
         implicitWidth: Kirigami.Units.iconSizes.medium
         implicitHeight: Kirigami.Units.iconSizes.medium
         Layout.minimumWidth: Kirigami.Units.iconSizes.medium
         Layout.minimumHeight: Kirigami.Units.iconSizes.medium
         Layout.preferredWidth: Kirigami.Units.iconSizes.medium
         Layout.preferredHeight: Kirigami.Units.iconSizes.medium
+        activeFocusOnTab: true
+
+        Accessible.name: root.toolTipSubText
+        Accessible.role: Accessible.Button
+
+        Keys.onPressed: function(event) {
+            root.handleActivationKey(event);
+        }
 
         Kirigami.Icon {
             anchors.centerIn: parent
             width: Math.min(parent.width, parent.height) * 1.3
             height: width
             source: root.iconName
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            hoverEnabled: true
-            onClicked: root.toggleKeyboard()
+            active: hoverHandler.hovered || compactButton.activeFocus
+            opacity: root.busy ? 0.6 : 1.0
         }
     }
 
-    fullRepresentation: MouseArea {
+    fullRepresentation: Item {
         id: button
 
         Layout.minimumWidth: Kirigami.Units.iconSizes.medium
@@ -81,24 +105,18 @@ PlasmoidItem {
         Layout.preferredWidth: Kirigami.Units.iconSizes.large
         Layout.preferredHeight: Kirigami.Units.iconSizes.large
         activeFocusOnTab: true
-        cursorShape: Qt.PointingHandCursor
-        hoverEnabled: true
 
         Accessible.name: root.toolTipSubText
         Accessible.role: Accessible.Button
 
-        onClicked: root.toggleKeyboard()
         Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-                root.toggleKeyboard();
-                event.accepted = true;
-            }
+            root.handleActivationKey(event);
         }
 
         Kirigami.Icon {
             anchors.fill: parent
             anchors.margins: Kirigami.Units.smallSpacing
-            active: button.containsMouse || button.activeFocus
+            active: hoverHandler.hovered || button.activeFocus
             opacity: root.busy ? 0.6 : 1.0
             source: root.iconName
 

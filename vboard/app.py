@@ -35,6 +35,9 @@ class VboardApplication(Gtk.Application):
         Gtk.Application.do_startup(self)
         GLib.set_prgname(APP_ID)
         GLib.set_application_name(APP_DISPLAY_NAME)
+        toggle_action = Gio.SimpleAction.new("toggle", None)
+        toggle_action.connect("activate", self.on_toggle_action)
+        self.add_action(toggle_action)
         if is_kde_environment() and is_wayland_session():
             suppressor = KWinVirtualKeyboardSuppressor(Gio, GLib)
             if suppressor.start():
@@ -86,11 +89,7 @@ class VboardApplication(Gtk.Application):
             return 0
 
         if args == ["--toggle"]:
-            if self.window is None:
-                window = self.ensure_window()
-                self.show_window(window)
-            else:
-                self.window.toggle_visibility()
+            self.toggle_window()
             return 0
 
         if not args:
@@ -99,6 +98,16 @@ class VboardApplication(Gtk.Application):
 
         command_line.printerr_literal(USAGE)
         return 1
+
+    def toggle_window(self):
+        if self.window is None:
+            window = self.ensure_window()
+            self.show_window(window)
+        else:
+            self.window.toggle_visibility()
+
+    def on_toggle_action(self, action=None, parameter=None):
+        self.toggle_window()
 
     def on_window_destroy(self, window):
         self.window = None
