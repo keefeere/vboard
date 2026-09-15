@@ -1,5 +1,5 @@
 Name:           vboard
-Version:        2.11.0
+Version:        2.11.1
 Release:        1%{?dist}
 Summary:        Wayland virtual keyboard with modifier key support
 
@@ -96,6 +96,9 @@ python3 -m unittest discover -s tests -v
 
 
 %changelog
+* Tue Sep 15 2026 Chechulin Serhii <78239416+keefeere@users.noreply.github.com> - 2.11.1-1
+- Improve Super touch behavior and accelerate the Plasma widget toggle
+
 * Mon Sep 07 2026 Chechulin Serhii <78239416+keefeere@users.noreply.github.com> - 2.11.0-1
 - Add XKB alternate labels, touch-gap recovery, safer swipe typing, and dual-layout legends
 
